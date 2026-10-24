@@ -1,0 +1,7 @@
+# Bundle patch for dsh-hao-import.
+#
+# 声明 dsh.bundle.patch 后，`dsh plugin --profile desktop add` 会把这个包
+# 加进 dsh.profile.bundles；下面这行 insert 负责把它挂载到宿主内核上。
+- insert:
+    - id: dsh-hao-import
+      name: dsh-hao-import
