@@ -8,6 +8,8 @@
 
 Hao Wallpaper 的壁纸存在自己的目录里，而 DSH 壁纸引擎只认 `~/.dsh-wallpaper-engine/uploads/` 下的 `up-*` 文件。每次下载完都要手动拷贝、改名、写标题——本插件把这件事变成「打开 DSH 就自动完成」。
 
+> **前置条件**：需要先安装 **`dsh-plugin-wallpaper-engine`**（DSH 壁纸引擎插件）。本插件解决的是「壁纸引擎装好后没有可用壁纸」的问题；没有壁纸引擎时，导入的文件不会被展示。
+
 ---
 
 ## 特性
@@ -43,6 +45,7 @@ DSH 启动
 
 - **macOS**（脚本按 macOS 的目录约定与 `/bin/bash` 编写）
 - **DeepSeek Harness** ≥ `0.2.0-rc.1`
+- **DSH 壁纸引擎插件**（`dsh-plugin-wallpaper-engine`）：本插件只负责把壁纸导入引擎的数据目录，壁纸的实际展示由该插件负责；没装它时导入的文件不会出现在 DSH 里
 - **Python 3.8+**（优先使用 DSH 自带运行时，找不到再退回系统 `python3`）
 - **Hao Wallpaper**，并且至少下载过一张壁纸
 
