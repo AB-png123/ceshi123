@@ -2,6 +2,17 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.2.0 — 2026-10-25
+
+修复「装完空转」：其他机器从 GitHub 安装后找不到脚本，插件只写一行日志、什么也不做。
+
+- 默认执行**包内** `scripts/run-import.sh`：通过 `dsh plugin add github:…` / tgz 装好后即可工作，无需先手动放置脚本。
+- `~/.dsh/wallpaper-import/` 降级为可选路径，仅当显式设置 `DSH_HAO_IMPORT_SCRIPT` 时使用；不再静默回退。
+- 脚本或同目录 `import_hao.py` 缺失时，插件以 **error** 级别报出完整路径、来源（包内/环境变量）与修复方式，不再静默跳过。
+- `install.sh` 改为可选的脚本副本安装器，并在输出里说明插件默认不依赖该目录。
+- README 重写安装章节：删除「先克隆再复制脚本」的前置步骤，补充包内路径、手动运行与排障。
+- CI 增加打包断言，确保 `scripts/run-import.sh`、`scripts/import_hao.py` 确实进入 npm tarball。
+
 ## 1.1.0 — 2026-10-25
 
 首个开源仓库版本。

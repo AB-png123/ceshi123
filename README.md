@@ -11,7 +11,7 @@ Hao Wallpaper 的壁纸存在自己的目录里，而 DSH 壁纸引擎只认 `~/
 ---
 
 ## 特性
--**注意使用该插件要先安装dsh-plugin-wallpaper-engine插件才可以配合使用，否则没使用，该插件主要作用是为了解决plugin-wallpaper-engine插件安装后wallpaper-engine引擎没有可用壁纸的解决方案。
+
 - **启动即导入**：挂在 DSH 内核 `apply()` 上，每次启动后台执行一次，不阻塞启动。
 - **增量 + 幂等**：按「壁纸 id + 类型」记录已导入条目，重复启动只会得到「新增 0 条」。
 - **动态壁纸优先**：有 `wallpaper.mp4` 就导入真视频，避免把首帧图当成两条。
@@ -37,7 +37,7 @@ DSH 启动
 | `cordis.patch.yml` | bundle patch，让 `dsh plugin add` 把插件挂到宿主内核 |
 | `scripts/run-import.sh` | 无界面入口：查找 Python、冷却、写日志 |
 | `scripts/import_hao.py` | 真正的扫描 / 去重 / 复制 / 写标题逻辑 |
-| `install.sh` | 把脚本安装到 `~/.dsh/wallpaper-import/`，可选装插件 |
+| `install.sh` | 可选：把脚本复制到 `~/.dsh/wallpaper-import/`，并可选装插件（插件本身不需要） |
 
 ## 环境要求
 
@@ -48,52 +48,29 @@ DSH 启动
 
 ## 安装
 
-### 1. 获取源码
-
-```bash
-git clone https://github.com/AB-png123/ceshi123.git
-cd ceshi123
-```
-
-### 2. 安装导入脚本
-
-```bash
-./install.sh
-```
-
-脚本会被复制到 `~/.dsh/wallpaper-import/`。也可以手动安装：
-
-```bash
-mkdir -p ~/.dsh/wallpaper-import
-cp scripts/run-import.sh scripts/import_hao.py ~/.dsh/wallpaper-import/
-chmod +x ~/.dsh/wallpaper-import/run-import.sh
-```
-
-### 3. 安装插件本体
-
-任选一种：
+插件**自带导入脚本**（包内 `scripts/`），装好插件就能用——不需要先克隆仓库、也不需要手动复制任何文件到 `~/.dsh/wallpaper-import/`。
 
 ```bash
 # A. 直接从 GitHub 安装
 dsh plugin --profile desktop add github:AB-png123/ceshi123
 
-# B. 或者先打包，再安装本地 tgz
-npm pack .
-cd ~/.dsh/profiles/desktop
-dsh plugin --profile desktop add /path/to/ceshi123/dsh-hao-import-1.1.0.tgz
-
-# C. 或者让安装脚本代劳（上一步的 ./install.sh 加 --with-plugin）
+# B. 或者从 Release 下载 tgz 后安装
+dsh plugin --profile desktop add /path/to/dsh-hao-import-1.2.0.tgz
 ```
 
-### 4. 重启 DSH
+> 旧版本要求先把脚本放进 `~/.dsh/wallpaper-import/`，否则插件只会静默跳过；1.2.0 起默认执行包内脚本，`~/.dsh/wallpaper-import/` 降级为**可选手动/自定义路径**（见下方 `DSH_HAO_IMPORT_SCRIPT`）。
+>
+> `./install.sh` 现在只服务于想手动管理脚本副本的用户（例如配合 launchd），仍可用 `./install.sh --with-plugin` 一步复制并安装插件；它不是安装的前置步骤。
 
-重启 DeepSeek Harness 应用后生效。验证：
+重启 DSH 应用后生效。验证：
 
 ```bash
 tail -n 10 ~/.dsh-wallpaper-engine/import.log
 ```
 
-看到 `[时间] rc=0` 和「新增 N 条」就说明跑通了。
+看到 `[时间] rc=0` 和「新增 N 条」就说明跑通了；没有新壁纸时会显示「新增 0 条」。
+
+如果插件安装不完整（包内 `scripts/` 缺失）或 `DSH_HAO_IMPORT_SCRIPT` 指向了不存在的文件，插件会以 **error 级别**记录「找不到导入脚本 …」并给出修复方式，而不是静默跳过。DSH 日志位置：`~/.dsh/logs/`。
 
 ## 配置
 
@@ -102,7 +79,7 @@ tail -n 10 ~/.dsh-wallpaper-engine/import.log
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `DSH_HAO_IMPORT_DISABLE` | 未设置 | 设为 `1` 关闭导入 |
-| `DSH_HAO_IMPORT_SCRIPT` | `~/.dsh/wallpaper-import/run-import.sh` | 覆盖脚本路径 |
+| `DSH_HAO_IMPORT_SCRIPT` | 插件包内 `scripts/run-import.sh` | 显式覆盖脚本路径（例如 `~/.dsh/wallpaper-import/run-import.sh`） |
 | `DSH_HAO_IMPORT_PYTHON` | 自动查找 | 指定 `python3` 解释器 |
 | `HAO_WALLPAPER_DIR` | `~/Desktop/数据/壁纸` | Hao Wallpaper 壁纸库目录 |
 | `DSH_WALLPAPER_ENGINE_DIR` | `~/.dsh-wallpaper-engine` | 壁纸引擎数据目录（日志也在这里） |
@@ -110,16 +87,22 @@ tail -n 10 ~/.dsh-wallpaper-engine/import.log
 
 ## 手动运行与调试
 
+插件安装后，脚本在 profile 的 `node_modules/dsh-hao-import/scripts/` 下，可以直接运行：
+
 ```bash
+cd ~/.dsh/profiles/desktop/node_modules/dsh-hao-import
+
 # 立即跑一次（跳过 15 秒冷却）
-~/.dsh/wallpaper-import/run-import.sh --force
+bash scripts/run-import.sh --force
 
 # 只看会导入什么，不写任何文件
-~/.dsh/wallpaper-import/run-import.sh --dry-run
+bash scripts/run-import.sh --dry-run
 
 # 直接调用 Python（同样支持 --dry-run）
-~/.dsh/wallpaper-import/import_hao.py --dry-run
+python3 scripts/import_hao.py --dry-run
 ```
+
+如果你把脚本复制到了 `~/.dsh/wallpaper-import/` 并想继续用那份副本，设置 `DSH_HAO_IMPORT_SCRIPT=~/.dsh/wallpaper-import/run-import.sh` 即可；插件不会自动回退到该目录。
 
 ## 数据与状态文件
 
@@ -137,6 +120,7 @@ tail -n 10 ~/.dsh-wallpaper-engine/import.log
 
 ```bash
 dsh plugin --profile desktop remove dsh-hao-import
+# 仅当你手动复制过脚本时才需要：
 rm -rf ~/.dsh/wallpaper-import
 # 可选：清掉已导入的壁纸与状态
 # rm -rf ~/.dsh-wallpaper-engine
@@ -156,6 +140,7 @@ rm -rf ~/.dsh/wallpaper-import
 | 日志写「壁纸库不存在」 | 用 `HAO_WALLPAPER_DIR` 指向实际目录，或先在 Hao Wallpaper 下载一张 |
 | 一直「新增 0 条」 | 已导入过；检查 `.imported.json`，或删掉对应键重试 |
 | 启动后没有触发 | `dsh plugin ls` 确认插件在列表中，然后重启 DSH |
+| 日志报「找不到导入脚本 …」 | 插件安装不完整（包内 `scripts/` 缺失）或 `DSH_HAO_IMPORT_SCRIPT` 失效；重装插件，或把该变量指向有效的 `run-import.sh` |
 | 报「未找到 python3」 | 设置 `DSH_HAO_IMPORT_PYTHON=/usr/bin/python3` |
 | 插件加载失败 | 确认 DSH 版本 ≥ `0.2.0-rc.1`（`package.json` 里的 `dsh.engines.dsh`） |
 
@@ -163,8 +148,10 @@ rm -rf ~/.dsh/wallpaper-import
 
 ```bash
 node --check lib/index.js
+npm test                       # node --test test/*.test.mjs
 python3 -m py_compile scripts/import_hao.py
 bash -n scripts/run-import.sh install.sh
+npm pack --dry-run             # 确认 scripts/ 进入 tarball
 ```
 
 欢迎 Issue / PR：<https://github.com/AB-png123/ceshi123/issues>

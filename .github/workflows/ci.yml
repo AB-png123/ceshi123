@@ -28,3 +28,13 @@ jobs:
 
       - name: Check package manifest
         run: node -e "const p=require('./package.json'); if(!p.dsh?.bundle?.patch) process.exit(1); console.log(p.name, p.version)"
+
+      - name: Run plugin tests
+        run: node --test test/*.test.mjs
+
+      - name: Verify scripts ship in the tarball
+        run: |
+          npm pack --silent >/dev/null
+          TARBALL=$(ls dsh-hao-import-*.tgz)
+          tar -tzf "$TARBALL" | grep -qx 'package/scripts/run-import.sh'
+          tar -tzf "$TARBALL" | grep -qx 'package/scripts/import_hao.py'
