@@ -55,11 +55,13 @@ DSH 启动
 
 ```bash
 # A. 直接从 GitHub 安装
-dsh plugin --profile desktop add github:AB-png123/ceshi123
+dsh plugin --profile desktop add github:AB-png123/dshplugin
 
 # B. 或者从 Release 下载 tgz 后安装
 dsh plugin --profile desktop add /path/to/dsh-hao-import-1.2.0.tgz
 ```
+
+> 仓库早前名为 `AB-png123/ceshi123`，GitHub 会自动重定向；当前地址是 `AB-png123/dshplugin`。
 
 > 旧版本要求先把脚本放进 `~/.dsh/wallpaper-import/`，否则插件只会静默跳过；1.2.0 起默认执行包内脚本，`~/.dsh/wallpaper-import/` 降级为**可选手动/自定义路径**（见下方 `DSH_HAO_IMPORT_SCRIPT`）。
 >
@@ -157,7 +159,7 @@ bash -n scripts/run-import.sh install.sh
 npm pack --dry-run             # 确认 scripts/ 进入 tarball
 ```
 
-欢迎 Issue / PR：<https://github.com/AB-png123/ceshi123/issues>
+欢迎 Issue / PR：<https://github.com/AB-png123/dshplugin/issues>
 
 ## 隐私
 

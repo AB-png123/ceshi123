@@ -23,11 +23,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AB-png123/ceshi123.git"
+    "url": "git+https://github.com/AB-png123/dshplugin.git"
   },
-  "homepage": "https://github.com/AB-png123/ceshi123#readme",
+  "homepage": "https://github.com/AB-png123/dshplugin#readme",
   "bugs": {
-    "url": "https://github.com/AB-png123/ceshi123/issues"
+    "url": "https://github.com/AB-png123/dshplugin/issues"
   },
   "author": "AB-png123",
   "license": "MIT",

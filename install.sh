@@ -51,7 +51,7 @@ else
   cat <<EOF
 
 插件默认使用包内脚本，通常直接安装即可：
-  dsh plugin --profile $PROFILE add github:AB-png123/ceshi123
+  dsh plugin --profile $PROFILE add github:AB-png123/dshplugin
 
 若想使用刚复制的副本：
   DSH_HAO_IMPORT_SCRIPT=$DEST/run-import.sh
