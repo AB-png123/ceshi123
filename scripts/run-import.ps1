@@ -20,6 +20,9 @@
 # 注意：插件以 stdio=ignore 后台启动本脚本，所以任何早期错误（缺脚本、缺 Python）
 # 都必须自己写进 import.log，否则用户只能看到一句「退出码 127」。
 $ErrorActionPreference = 'Continue'
+if ($env:DSH_HAO_IMPORT_DEBUG -eq '1') {
+  [Console]::Error.WriteLine("debug: ps=$($PSVersionTable.PSVersion) pythonLocation=$env:pythonLocation")
+}
 
 $SELF_DIR = $PSScriptRoot
 if (-not $SELF_DIR) { $SELF_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path }
@@ -124,6 +127,9 @@ function Test-Python([string]$Exe, [string[]]$Prefix = @()) {
     $v = & $Exe @cmdArgs 2>$null
     if ($LASTEXITCODE -ne 0) { return $false }
     $text = ("$v" -replace '\s', '')
+    if ($env:DSH_HAO_IMPORT_DEBUG -eq '1') {
+      [Console]::Error.WriteLine("debug: test $Exe => rc=$LASTEXITCODE text='$text'")
+    }
     if (-not $text) { return $false }
     try {
       $ver = [version]$text
@@ -132,6 +138,9 @@ function Test-Python([string]$Exe, [string[]]$Prefix = @()) {
     }
     return ($ver -ge [version]'3.8')
   } catch {
+    if ($env:DSH_HAO_IMPORT_DEBUG -eq '1') {
+      [Console]::Error.WriteLine("debug: test $Exe threw: $_")
+    }
     return $false
   }
 }
@@ -177,6 +186,9 @@ function Find-Python {
     if ($p) { $candidates += $p }
   }
   foreach ($c in $candidates) {
+    if ($env:DSH_HAO_IMPORT_DEBUG -eq '1') {
+      [Console]::Error.WriteLine("debug: candidate '$c' exists=$(Test-Path -LiteralPath $c)")
+    }
     if ($c -and (Test-Path -LiteralPath $c) -and (Test-Python $c @())) {
       return [pscustomobject]@{ Exe = $c; Prefix = @() }
     }

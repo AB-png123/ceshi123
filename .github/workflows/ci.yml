@@ -95,6 +95,7 @@ jobs:
             (Join-Path $data 'wallpaper-data.json'), $meta,
             (New-Object System.Text.UTF8Encoding $false)
           )
+          $env:DSH_HAO_IMPORT_DEBUG = '1'
           $env:HAO_WALLPAPER_DATA_DIR = $data
           $env:HAO_WALLPAPER_DIR = (Join-Path $root 'no-such-lib')
           $env:DSH_WALLPAPER_ENGINE_DIR = $engine
