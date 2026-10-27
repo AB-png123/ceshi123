@@ -71,7 +71,7 @@ DSH 启动
 dsh plugin --profile desktop add github:AB-png123/dshplugin
 
 # B. 或者从 Release 下载 tgz 后安装（Windows 下路径改成 C:\...）
-dsh plugin --profile desktop add /path/to/dsh-hao-import-1.3.1.tgz
+dsh plugin --profile desktop add /path/to/dsh-hao-import-1.3.2.tgz
 ```
 
 > 仓库早前名为 `AB-png123/ceshi123`，GitHub 会自动重定向；当前地址是 `AB-png123/dshplugin`。
@@ -179,7 +179,7 @@ Windows 上删除 `%USERPROFILE%\.dsh-wallpaper-engine` 即可清理数据。
 | 日志报「找不到导入脚本 …」 | 插件安装不完整（包内 `scripts/` 缺失）或 `DSH_HAO_IMPORT_SCRIPT` 失效；重装插件，或把该变量指向有效入口脚本 |
 | 报「未找到 python3 / Python 3」 | 设置 `DSH_HAO_IMPORT_PYTHON`；Windows 会优先使用 DSH 自带 Python，其次 `py -3` / `python`，都没有时再安装 python.org 版本并勾选 Add to PATH |
 | 导入成功但 DSH 壁纸里看不到 | 壁纸引擎改过上传目录：检查 `<引擎目录>/config.json` 的 `uploadDir`，或 `DSH_WE_UPLOAD_DIR`；日志里的「导入目标（上传目录）」就是实际写入位置 |
-| Windows 日志中文乱码 | 升级到 1.3.1+（PowerShell 5.1 下按 UTF-8 捕获 Python 输出）；旧版受系统 OEM 代码页影响 |
+| Windows 日志中文乱码 | 升级到 1.3.2+（Python 写 UTF-8 报告文件，不再依赖 PowerShell 解码）；旧版受系统 OEM 代码页影响 |
 | Windows 提示脚本被禁用 | 插件本身用 `-ExecutionPolicy Bypass` 启动；手动执行时也加该参数，或直接运行 `python scripts\import_hao.py` |
 | 插件加载失败 | 确认 DSH 版本 ≥ `0.2.0-rc.1`（`package.json` 里的 `dsh.engines.dsh`） |
 
