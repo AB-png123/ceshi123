@@ -74,8 +74,10 @@ function Write-Log([string]$Text) {
 }
 
 function Fail([int]$Code, [string]$Message) {
-  Write-Error $Message
-  Write-Log "`n[$(Get-Stamp)] rc=$Code`n$Message`n"
+  # 不用 Write-Error：调用方若设了 $ErrorActionPreference='Stop'，写入错误会变成
+  # 终止异常，exit 根本执行不到，退出码就变成 1。
+  try { Write-Log "`n[$(Get-Stamp)] rc=$Code`n$Message`n" } catch {}
+  try { [Console]::Error.WriteLine("dsh-hao-import: $Message") } catch {}
   exit $Code
 }
 
