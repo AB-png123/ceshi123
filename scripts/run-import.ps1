@@ -114,9 +114,14 @@ if (-not $Force -and -not $Dry -and (Test-Path -LiteralPath $Cool)) {
   if (($now - $last) -lt 15) { exit 0 }
 }
 
-function Test-Python([string]$Exe, [string[]]$Prefix) {
+function Test-Python([string]$Exe, [string[]]$Prefix = @()) {
   try {
-    $v = & $Exe @Prefix '-c' 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))' 2>$null
+    # PowerShell 5.1 里未绑定的 [string[]] 是 $null，直接 @Prefix 会抛
+    # "Cannot index into a null array"；先归一成数组再 splat。
+    $cmdArgs = @()
+    if ($Prefix) { $cmdArgs += $Prefix }
+    $cmdArgs += @('-c', 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))')
+    $v = & $Exe @cmdArgs 2>$null
     if ($LASTEXITCODE -ne 0) { return $false }
     $text = ("$v" -replace '\s', '')
     if (-not $text) { return $false }
