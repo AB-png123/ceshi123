@@ -114,8 +114,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path $root, $engine | Out-Null
           Copy-Item scripts/run-import.ps1 (Join-Path $root 'run-import.ps1')
           $env:DSH_WALLPAPER_ENGINE_DIR = $engine
-          & (Join-Path $root 'run-import.ps1')
-          if ($LASTEXITCODE -ne 127) { throw "expected 127, got $LASTEXITCODE" }
+          # 脚本内部 exit 127 会终止整个调用它的 PowerShell 会话，
+          # 必须放到子进程里跑才能检查退出码。
+          $runner = Join-Path $root 'run-import.ps1'
+          $proc = Start-Process -FilePath 'powershell.exe' `
+            -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $runner) `
+            -Wait -PassThru -NoNewWindow
+          if ($proc.ExitCode -ne 127) { throw "expected 127, got $($proc.ExitCode)" }
           $log = Get-Content -Raw -Encoding UTF8 (Join-Path $engine 'import.log')
           if ($log -notmatch 'import_hao.py') { throw "missing-script error not logged: $log" }
 
