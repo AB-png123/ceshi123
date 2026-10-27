@@ -90,7 +90,7 @@ jobs:
           $png = Join-Path $root 'pic.png'
           [System.IO.File]::WriteAllText($png, 'png-bytes', (New-Object System.Text.UTF8Encoding $false))
           $meta = @{
-            staticWallpapers = @{ a = @{ id = '1'; title = 'Win-壁纸-旧版'; localPath = $png } }
+            staticWallpapers = @{ a = @{ id = '1'; title = ('Win-' + [char]0x58C1 + [char]0x7EB8 + '-' + [char]0x65E7 + [char]0x7248); localPath = $png } }
             dynamicWallpapers = @{}
           } | ConvertTo-Json -Depth 5
           [System.IO.File]::WriteAllText(
