@@ -14,9 +14,18 @@ set -uo pipefail
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="$SELF_DIR/import_hao.py"
-ENGINE="${DSH_WALLPAPER_ENGINE_DIR:-$HOME/.dsh-wallpaper-engine}"
+ENGINE="${DSH_WALLPAPER_ENGINE_DIR:-${DSH_WE_DATA_DIR:-$HOME/.dsh-wallpaper-engine}}"
 LOG="$ENGINE/import.log"
 COOL="$ENGINE/.last-run"
+
+log_fail() {
+  local code="$1"
+  local message="$2"
+  mkdir -p "$ENGINE" 2>/dev/null || true
+  printf '\n[%s] rc=%s\n%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$code" "$message" >> "$LOG" 2>/dev/null || true
+  echo "$message" >&2
+  exit "$code"
+}
 
 find_python() {
   if [ -n "${DSH_HAO_IMPORT_PYTHON:-}" ] && [ -x "$DSH_HAO_IMPORT_PYTHON" ]; then
@@ -38,12 +47,10 @@ find_python() {
 
 PY="$(find_python)"
 if [ -z "$PY" ]; then
-  echo "dsh-hao-import: 未找到 python3（可用 DSH_HAO_IMPORT_PYTHON 指定）" >&2
-  exit 127
+  log_fail 127 "dsh-hao-import: 未找到 python3（可用 DSH_HAO_IMPORT_PYTHON 指定）"
 fi
 if [ ! -f "$SCRIPT" ]; then
-  echo "dsh-hao-import: 缺少 $SCRIPT" >&2
-  exit 127
+  log_fail 127 "dsh-hao-import: 缺少 ${SCRIPT}（插件包不完整，请重装）"
 fi
 
 mkdir -p "$ENGINE"
@@ -82,7 +89,7 @@ RC=$?
 printf '\n[%s] rc=%s\n%s\n' "$TS" "$RC" "$OUT" >> "$LOG"
 
 if [ "$RC" -ne 0 ]; then
-  echo "导入失败（$RC）："
+  echo "导入失败（${RC}）："
   echo "$OUT" | tail -5
   exit 1
 fi

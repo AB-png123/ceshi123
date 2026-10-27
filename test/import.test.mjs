@@ -41,6 +41,8 @@ function envFor(d) {
     HAO_WALLPAPER_DIR: d.lib,
     HAO_WALLPAPER_DIRS: '',
     DSH_WALLPAPER_ENGINE_DIR: d.engine,
+    DSH_WE_DATA_DIR: '',
+    DSH_WE_UPLOAD_DIR: '',
     DSH_HAO_IMPORT_SCRIPT: '',
   }
 }
@@ -70,6 +72,7 @@ test('imports the absolute localPath recorded in metadata (no default library ne
   assert.equal(dry.status, 0, dry.stderr)
   assert.match(dry.stdout, /DRY-RUN 预计新增 1 条/)
   assert.match(dry.stdout, /测试-壁纸-标题/)
+  assert.ok(!existsSync(path.join(d.engine, 'uploads')))
   assert.ok(!existsSync(path.join(d.engine, 'uploads', '.meta.json')))
 
   const real = run([], env)
@@ -129,6 +132,72 @@ test('missing library exits 0 and prints the searched paths', { skip }, () => {
   assert.match(res.stdout, /未找到可导入的壁纸/)
   assert.match(res.stdout, /已查找壁纸库/)
   assert.match(res.stdout, /HAO_WALLPAPER_DIR/)
+})
+
+test('honors uploadDir from the engine config.json', { skip }, () => {
+  const d = baseDirs('cfgupload-')
+  mkdirSync(d.engine, { recursive: true })
+  const custom = path.join(d.home, 'custom-uploads')
+  writeFileSync(path.join(d.engine, 'config.json'), JSON.stringify({ uploadDir: custom }))
+
+  const itemDir = path.join(d.home, 'Downloads', 'hao-31')
+  mkdirSync(itemDir, { recursive: true })
+  const file = path.join(itemDir, 'whatever.jPg')
+  writeFileSync(file, 'jpg-bytes')
+  writeMetadata(d, [{ id: '31', title: '自定义上传目录', localPath: file }])
+
+  const res = run([], envFor(d))
+  assert.equal(res.status, 0, res.stderr)
+  assert.equal(readJson(path.join(custom, '.meta.json'))['up-hao-01'].title, '自定义上传目录')
+  assert.ok(existsSync(path.join(custom, 'up-hao-01.jpg')))
+  assert.ok(!existsSync(path.join(d.engine, 'uploads')))
+})
+
+test('DSH_WE_UPLOAD_DIR beats config.json and uploads/', { skip }, () => {
+  const d = baseDirs('envupload-')
+  mkdirSync(d.engine, { recursive: true })
+  const fromConfig = path.join(d.home, 'config-uploads')
+  const fromEnv = path.join(d.home, 'env-uploads')
+  writeFileSync(path.join(d.engine, 'config.json'), JSON.stringify({ uploadDir: fromConfig }))
+
+  const itemDir = path.join(d.home, 'Downloads', 'hao-32')
+  mkdirSync(itemDir, { recursive: true })
+  writeFileSync(path.join(itemDir, 'wallpaper.png'), 'png')
+  writeMetadata(d, [{ id: '32', title: '环境变量优先', localPath: path.join(itemDir, 'wallpaper.png') }])
+
+  const env = { ...envFor(d), DSH_WE_UPLOAD_DIR: fromEnv }
+  const res = run([], env)
+  assert.equal(res.status, 0, res.stderr)
+  assert.ok(existsSync(path.join(fromEnv, 'up-hao-01.png')))
+  assert.ok(!existsSync(fromConfig))
+})
+
+test('DSH_WE_DATA_DIR is used when the legacy engine variable is unset', { skip }, () => {
+  const d = baseDirs('wedata-')
+  const itemDir = path.join(d.home, 'Downloads', 'hao-33')
+  mkdirSync(itemDir, { recursive: true })
+  writeFileSync(path.join(itemDir, 'wallpaper.png'), 'png')
+  writeMetadata(d, [{ id: '33', title: 'WE 数据目录', localPath: path.join(itemDir, 'wallpaper.png') }])
+
+  const env = { ...envFor(d), DSH_WALLPAPER_ENGINE_DIR: '', DSH_WE_DATA_DIR: d.engine }
+  const res = run([], env)
+  assert.equal(res.status, 0, res.stderr)
+  assert.ok(existsSync(path.join(d.engine, 'uploads', 'up-hao-01.png')))
+})
+
+test('skips formats the wallpaper engine cannot display', { skip }, () => {
+  const d = baseDirs('unsupported-')
+  const itemDir = path.join(d.home, 'Downloads', 'hao-34')
+  mkdirSync(itemDir, { recursive: true })
+  const webm = path.join(itemDir, 'clip.webm')
+  writeFileSync(webm, 'webm-bytes')
+  writeMetadata(d, [{ id: '34', title: '不支持的格式', localPath: webm }])
+
+  const res = run([], envFor(d))
+  assert.equal(res.status, 0, res.stderr)
+  assert.match(res.stderr, /不受 DSH 壁纸引擎支持/)
+  assert.match(res.stdout, /未找到可导入的壁纸/)
+  assert.ok(!existsSync(path.join(d.engine, 'uploads', '.meta.json')))
 })
 
 test.after(() => rmSync(WORK, { recursive: true, force: true }))

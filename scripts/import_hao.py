@@ -5,8 +5,10 @@
   · 优先读 Hao Wallpaper 元数据里的 localPath（绝对路径），按 id 找到壁纸文件；
     因此即使壁纸库不在默认位置，也能正确导入。
   · 再扫描壁纸库目录里的 wallpaper-<id>/ 作为兜底（可用 HAO_WALLPAPER_DIR 覆盖）。
-  · 每个壁纸「动态优先」：目录里有 wallpaper.mp4/webm/mov 就导入视频，
-    否则用 image-wallpaper.png / wallpaper.png 的静态图。
+  · 每个壁纸「动态优先」：目录里有 wallpaper.mp4 就导入视频，
+    否则用 image-wallpaper / wallpaper 的 png / jpg 静态图。
+    DSH 壁纸引擎的上传白名单只有 mp4 / jpg / jpeg / png；
+    webm / mov / webp / bmp / gif 会被跳过并在输出里说明，不会产生“导入了却看不见”的文件。
   · 已导入的条目按「壁纸 id + 类型」记录在 uploads/.imported.json，重复运行只增不减。
   · 标题取自 Hao Wallpaper 的 wallpaper-data.json / wallpaper-cache-index.json，
     截取前 3 段关键词；动态壁纸条目追加「（动态）」。
@@ -17,10 +19,17 @@
 环境变量：
   HAO_WALLPAPER_DIR           壁纸库目录（单一路径）
   HAO_WALLPAPER_DIRS          多个壁纸库目录，用系统路径分隔符连接（: / ;）
-  DSH_WALLPAPER_ENGINE_DIR    壁纸引擎数据目录（默认 ~/.dsh-wallpaper-engine）
+  DSH_WALLPAPER_ENGINE_DIR    壁纸引擎数据目录（本插件的旧变量，优先）
+  DSH_WE_DATA_DIR             壁纸引擎自己的数据目录变量（与引擎一致，默认
+                              ~/.dsh-wallpaper-engine）
+  DSH_WE_UPLOAD_DIR           壁纸引擎自己的上传目录变量（优先于 config.json）
   HAO_WALLPAPER_DATA_DIR      Hao Wallpaper 元数据目录（默认自动探测）
                               macOS: ~/Library/Application Support/Hao Wallpaper
                               Windows: %APPDATA%\\Hao Wallpaper 等
+
+上传目录与壁纸引擎的解析链完全一致：
+  DSH_WE_UPLOAD_DIR → dataDir/config.json 的 uploadDir → dataDir/uploads
+所以用户在引擎设置里改过上传目录后，导入的壁纸仍然可见。
 """
 from __future__ import annotations
 
@@ -30,6 +39,7 @@ import os
 import shutil
 import sys
 import tempfile
+import time
 
 # Windows 控制台/重定向默认用本地代码页，直接输出中文可能抛 UnicodeEncodeError。
 # 统一成 UTF-8，保证 import.log 与 CI 输出可读。
@@ -112,15 +122,54 @@ def data_dirs() -> list[str]:
     return default_data_dirs()
 
 
-ENGINE = env_path("DSH_WALLPAPER_ENGINE_DIR", os.path.join(HOME, ".dsh-wallpaper-engine"))
-UP = os.path.join(ENGINE, "uploads")
+def _engine_dir() -> str:
+    """壁纸引擎的数据目录，和引擎 pluginDataDir() 保持同一解析顺序。"""
+    legacy = os.environ.get("DSH_WALLPAPER_ENGINE_DIR")
+    if legacy:
+        return os.path.expanduser(legacy)
+    override = os.environ.get("DSH_WE_DATA_DIR")
+    if override and override.strip():
+        # 引擎只做 trim + resolve，不展开 ~；这里同样不展开，避免两边指向不同目录。
+        return override.strip()
+    return os.path.join(HOME, ".dsh-wallpaper-engine")
+
+
+def _upload_dir(engine: str) -> str:
+    """壁纸引擎的上传目录：DSH_WE_UPLOAD_DIR → config.json uploadDir → uploads。"""
+    override = os.environ.get("DSH_WE_UPLOAD_DIR")
+    if override:
+        # 引擎对 DSH_WE_UPLOAD_DIR 原样返回（不 trim、不展开），这里保持一致。
+        return override
+    try:
+        with open(os.path.join(engine, "config.json"), encoding="utf-8") as f:
+            cfg = json.load(f)
+        upload = cfg.get("uploadDir") if isinstance(cfg, dict) else None
+        if isinstance(upload, str) and upload.strip():
+            return upload.strip()
+    except Exception:
+        pass
+    return os.path.join(engine, "uploads")
+
+
+ENGINE = _engine_dir()
+UP = _upload_dir(ENGINE)
 META = os.path.join(UP, ".meta.json")
 STATE = os.path.join(UP, ".imported.json")
 
-VIDEO_NAMES = ("wallpaper.mp4", "wallpaper.webm", "wallpaper.mov")
-STILLS = ("image-wallpaper.png", "wallpaper.png")
-IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif")
-VIDEO_EXTS = (".mp4", ".webm", ".mov")
+# DSH 壁纸引擎的 UPLOAD_FILE_RE 只接受 mp4 / jpg / jpeg / png。
+# 其它格式即使复制进 uploads 也不会出现在壁纸列表里，所以这里直接不导入。
+VIDEO_NAMES = ("wallpaper.mp4",)
+STILLS = (
+    "image-wallpaper.png",
+    "image-wallpaper.jpg",
+    "image-wallpaper.jpeg",
+    "wallpaper.png",
+    "wallpaper.jpg",
+    "wallpaper.jpeg",
+)
+IMAGE_EXTS = (".png", ".jpg", ".jpeg")
+VIDEO_EXTS = (".mp4",)
+UNSUPPORTED_EXTS = (".webm", ".mov", ".webp", ".bmp", ".gif", ".avif", ".jfif")
 
 
 def load_json(path: str, default):
@@ -132,14 +181,25 @@ def load_json(path: str, default):
 
 
 def dump_json(path: str, data) -> None:
-    """原子写入，避免中途退出把状态文件写坏。"""
+    """原子写入，避免中途退出把状态文件写坏。
+
+    Windows 上杀毒 / 引擎偶尔会短暂占用目标文件，os.replace 抛 PermissionError；
+    重试几次能避开这类瞬时占用。
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-", suffix=".json")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=1)
             f.write("\n")
-        os.replace(tmp, path)
+        for attempt in range(3):
+            try:
+                os.replace(tmp, path)
+                return
+            except PermissionError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.15)
     except Exception:
         try:
             os.unlink(tmp)
@@ -223,6 +283,12 @@ def candidates_for_path(path: str) -> list[tuple[str, str]]:
     if found:
         return found
     ext = os.path.splitext(path)[1].lower()
+    if ext in UNSUPPORTED_EXTS:
+        print(
+            f"  ! 跳过 {path}：{ext} 不受 DSH 壁纸引擎支持（只接受 mp4 / jpg / png）",
+            file=sys.stderr,
+        )
+        return []
     if ext in VIDEO_EXTS:
         return [(path, "video")]
     if ext in IMAGE_EXTS:
@@ -260,6 +326,23 @@ def discover_sources(local_paths: dict[str, str]) -> dict[str, list[tuple[str, s
             found = candidates(folder)
             if found:
                 sources[wid] = found
+            else:
+                try:
+                    unsupported = next(
+                        (
+                            entry
+                            for entry in os.listdir(folder)
+                            if os.path.splitext(entry)[1].lower() in UNSUPPORTED_EXTS
+                        ),
+                        None,
+                    )
+                except OSError:
+                    unsupported = None
+                if unsupported:
+                    print(
+                        f"  ! 跳过 {folder}：{unsupported} 不受 DSH 壁纸引擎支持（只接受 mp4 / jpg / png）",
+                        file=sys.stderr,
+                    )
 
     return sources
 
@@ -273,6 +356,8 @@ def print_search_paths() -> None:
     for path in data_dirs():
         exists = os.path.isfile(os.path.join(path, "wallpaper-data.json"))
         print(f"  - {path} ({'存在' if exists else '不存在'})")
+    print(f"导入目标（上传目录）：{UP}")
+    print("支持的格式：mp4 / png / jpg / jpeg（其它格式引擎不识别，会被跳过）")
     print(
         "请先在 Hao Wallpaper 里下载一张壁纸；若装在非默认位置，"
         "用 HAO_WALLPAPER_DIR 或 HAO_WALLPAPER_DATA_DIR 指过去。"
@@ -284,7 +369,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="只打印将要导入的条目，不写文件")
     args = parser.parse_args(argv)
 
-    os.makedirs(UP, exist_ok=True)
+    # --dry-run 只预演，不创建目录、不写任何文件。
+    if not args.dry_run:
+        os.makedirs(UP, exist_ok=True)
     meta: dict = load_json(META, {})
     state: dict = load_json(STATE, {"ids": {}})
     seen: dict = state.setdefault("ids", {})
@@ -295,7 +382,7 @@ def main(argv: list[str] | None = None) -> int:
         print_search_paths()
         return 0
 
-    index = next_index(meta, os.listdir(UP))
+    index = next_index(meta, os.listdir(UP) if os.path.isdir(UP) else [])
 
     added: list[tuple[str, float, str]] = []
     for widget_id in sorted(sources):

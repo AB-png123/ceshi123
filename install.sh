@@ -25,7 +25,7 @@ for arg in "$@"; do
       exit 0
       ;;
     *)
-      echo "未知参数：$arg（可用 --with-plugin / --help）" >&2
+      echo "未知参数：${arg}（可用 --with-plugin / --help）" >&2
       exit 2
       ;;
   esac
@@ -34,7 +34,7 @@ done
 mkdir -p "$DEST"
 install -m 0755 "$ROOT/scripts/run-import.sh" "$DEST/run-import.sh"
 install -m 0755 "$ROOT/scripts/import_hao.py" "$DEST/import_hao.py"
-echo "✓ 脚本副本已复制到 $DEST（可选；插件默认使用包内脚本）"
+echo "✓ 脚本副本已复制到 ${DEST}（可选；插件默认使用包内脚本）"
 
 if [ "$WITH_PLUGIN" -eq 1 ]; then
   if ! command -v dsh >/dev/null 2>&1; then
@@ -42,7 +42,7 @@ if [ "$WITH_PLUGIN" -eq 1 ]; then
     exit 1
   fi
   if [ ! -d "$HOME/.dsh/profiles/$PROFILE" ]; then
-    echo "✗ 找不到 profile：$HOME/.dsh/profiles/$PROFILE（可用 DSH_PROFILE 指定）" >&2
+    echo "✗ 找不到 profile：$HOME/.dsh/profiles/${PROFILE}（可用 DSH_PROFILE 指定）" >&2
     exit 1
   fi
   echo "→ 正在把插件加入 $PROFILE profile …"

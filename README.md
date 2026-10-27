@@ -34,11 +34,15 @@ DSH 启动
        └─ python import_hao.py                  scripts/import_hao.py
             ├─ 读 wallpaper-data.json 的 localPath（Windows 主路径）
             ├─ 兜底扫描 wallpaper-<id>/ 目录
-            └─ 复制到 <引擎目录>/uploads/up-hao-NN.*
+            └─ 复制到 <上传目录>/up-hao-NN.*
                → 更新 .imported.json / .meta.json，追加 import.log
 ```
 
-`<引擎目录>` 默认是 `~/.dsh-wallpaper-engine`（Windows 为 `%USERPROFILE%\.dsh-wallpaper-engine`）。
+`<引擎目录>` 默认是 `~/.dsh-wallpaper-engine`（Windows 为 `%USERPROFILE%\.dsh-wallpaper-engine`），可用 `DSH_WALLPAPER_ENGINE_DIR` 或壁纸引擎自己的 `DSH_WE_DATA_DIR` 覆盖。
+
+`<上传目录>` **与壁纸引擎的解析链完全一致**：`DSH_WE_UPLOAD_DIR` → `<引擎目录>/config.json` 里的 `uploadDir` → `<引擎目录>/uploads`。这样即使用户在引擎设置里改过上传目录，导入的壁纸也能出现在 DSH 里；日志同样写在 `<引擎目录>/import.log`。
+
+> 1.3.1 起只导入引擎真正认识的 `mp4 / png / jpg / jpeg`。Hao Wallpaper 若只落地了 `.webm` / `.mov` / `.webp` / `.bmp` / `.gif`，脚本会明确打印「不受 DSH 壁纸引擎支持」并跳过，而不是复制一个永远不显示的 `up-*.webm`。
 
 | 组件 | 作用 |
 | --- | --- |
@@ -67,7 +71,7 @@ DSH 启动
 dsh plugin --profile desktop add github:AB-png123/dshplugin
 
 # B. 或者从 Release 下载 tgz 后安装（Windows 下路径改成 C:\...）
-dsh plugin --profile desktop add /path/to/dsh-hao-import-1.3.0.tgz
+dsh plugin --profile desktop add /path/to/dsh-hao-import-1.3.1.tgz
 ```
 
 > 仓库早前名为 `AB-png123/ceshi123`，GitHub 会自动重定向；当前地址是 `AB-png123/dshplugin`。
@@ -102,7 +106,9 @@ Get-Content -Tail 10 "$env:USERPROFILE\.dsh-wallpaper-engine\import.log"
 | `HAO_WALLPAPER_DIR` | macOS：`~/Desktop/数据/壁纸`；Windows：`~/Desktop/数据/壁纸`、`~/Pictures/Hao Wallpaper`、`~/Pictures/哲风壁纸` | 兜底扫描的壁纸库目录 |
 | `HAO_WALLPAPER_DIRS` | 未设置 | 多个壁纸库目录，用系统路径分隔符连接（Windows `;`，macOS `:`） |
 | `HAO_WALLPAPER_DATA_DIR` | macOS：`~/Library/Application Support/Hao Wallpaper`；Windows：`%APPDATA%\Hao Wallpaper` 等 | Hao Wallpaper 元数据目录（`wallpaper-data.json` 所在处） |
-| `DSH_WALLPAPER_ENGINE_DIR` | `~/.dsh-wallpaper-engine` | 壁纸引擎数据目录（日志也在这里） |
+| `DSH_WALLPAPER_ENGINE_DIR` | 未设置 | 本插件的旧兼容变量：壁纸引擎数据目录（优先于 `DSH_WE_DATA_DIR`），日志也写在这里 |
+| `DSH_WE_DATA_DIR` | `~/.dsh-wallpaper-engine` | 壁纸引擎自己的数据目录变量；插件跟随它，日志写在其下 |
+| `DSH_WE_UPLOAD_DIR` | 未设置 | 壁纸引擎自己的上传目录变量，优先级最高；设置后插件直接写入该目录 |
 
 > 在 Windows 上最省事的方式通常是**不配置任何路径**：插件会直接读元数据里的绝对路径。只有元数据缺失或壁纸库被移动时，才需要 `HAO_WALLPAPER_DATA_DIR` / `HAO_WALLPAPER_DIR`。
 
@@ -138,6 +144,8 @@ python .\scripts\import_hao.py --dry-run
 | `~/.dsh-wallpaper-engine/import.log` | 同上 | 每次运行的输出与退出码 |
 | `~/.dsh-wallpaper-engine/.last-run` | 同上 | 上次运行时间戳（15 秒冷却） |
 
+> 上表是默认路径。若壁纸引擎改过上传目录（`DSH_WE_UPLOAD_DIR` 或 `config.json` 的 `uploadDir`），`uploads/` 下的三个文件会跟着移动到新目录；`import.log` 与 `.last-run` 始终在引擎数据目录。
+
 想重新导入某张壁纸：删掉 `.imported.json` 里对应键和 `uploads/` 里的文件，再运行一次即可。
 
 ## 卸载
@@ -156,7 +164,8 @@ Windows 上删除 `%USERPROFILE%\.dsh-wallpaper-engine` 即可清理数据。
 
 - 支持 macOS 与 Windows；Linux 走 bash 入口，理论可用但未专门测试。
 - 依赖 Hao Wallpaper 的本地文件布局与元数据；Hao Wallpaper 改结构后需要同步调整脚本。
-- 动态壁纸只导入 `wallpaper.mp4` / `wallpaper.webm` / `wallpaper.mov` 本体；Hao Wallpaper 未落地真视频时（只有低清预览）不会导入。
+- 动态壁纸只导入引擎支持的 `wallpaper.mp4`；Hao Wallpaper 只落地 `.webm` / `.mov`（或只有低清预览）时不会导入，并会打印原因。
+- 静态图只导入 `png / jpg / jpeg`；`.webp` / `.bmp` / `.gif` 等即使复制进 `uploads/` 引擎也不会显示，脚本会跳过。
 - 标题来自 Hao Wallpaper 元数据，元数据缺失时退回「Hao壁纸」。
 - Windows 上若系统组策略禁止脚本执行，PowerShell 入口可能被拦；此时可手动运行 `python scripts\import_hao.py`。
 
@@ -168,7 +177,9 @@ Windows 上删除 `%USERPROFILE%\.dsh-wallpaper-engine` 即可清理数据。
 | 一直「新增 0 条」 | 已导入过；检查 `.imported.json`，或删掉对应键重试 |
 | 启动后没有触发 | `dsh plugin ls` 确认插件在列表中，然后重启 DSH |
 | 日志报「找不到导入脚本 …」 | 插件安装不完整（包内 `scripts/` 缺失）或 `DSH_HAO_IMPORT_SCRIPT` 失效；重装插件，或把该变量指向有效入口脚本 |
-| 报「未找到 python3 / Python 3」 | 设置 `DSH_HAO_IMPORT_PYTHON`；Windows 安装 python.org 版本并勾选 Add to PATH |
+| 报「未找到 python3 / Python 3」 | 设置 `DSH_HAO_IMPORT_PYTHON`；Windows 会优先使用 DSH 自带 Python，其次 `py -3` / `python`，都没有时再安装 python.org 版本并勾选 Add to PATH |
+| 导入成功但 DSH 壁纸里看不到 | 壁纸引擎改过上传目录：检查 `<引擎目录>/config.json` 的 `uploadDir`，或 `DSH_WE_UPLOAD_DIR`；日志里的「导入目标（上传目录）」就是实际写入位置 |
+| Windows 日志中文乱码 | 升级到 1.3.1+（PowerShell 5.1 下按 UTF-8 捕获 Python 输出）；旧版受系统 OEM 代码页影响 |
 | Windows 提示脚本被禁用 | 插件本身用 `-ExecutionPolicy Bypass` 启动；手动执行时也加该参数，或直接运行 `python scripts\import_hao.py` |
 | 插件加载失败 | 确认 DSH 版本 ≥ `0.2.0-rc.1`（`package.json` 里的 `dsh.engines.dsh`） |
 
@@ -207,4 +218,4 @@ powershell -NoProfile -Command "$e=$null; [void][System.Management.Automation.La
 
 `dsh-hao-import` is a small open-source plugin for DeepSeek Harness on **macOS and Windows**. On every DSH startup it imports newly downloaded [Hao Wallpaper](https://www.haowallpaper.com/) wallpapers into the DSH wallpaper engine (`~/.dsh-wallpaper-engine/uploads/`), idempotently, without blocking startup and without any network access.
 
-On Windows the plugin reads the absolute `localPath` values stored in Hao Wallpaper's `wallpaper-data.json`, so a non-default wallpaper library location still works. The entry point is PowerShell (`scripts/run-import.ps1`); no Git Bash or WSL is required. See the Chinese sections above for installation, configuration and troubleshooting.
+On Windows the plugin reads the absolute `localPath` values stored in Hao Wallpaper's `wallpaper-data.json`, so a non-default wallpaper library location still works. The entry point is PowerShell (`scripts/run-import.ps1`, compatible with Windows PowerShell 5.1); no Git Bash or WSL is required. The import target follows the wallpaper engine: `DSH_WE_UPLOAD_DIR` → `config.json`'s `uploadDir` → `<dataDir>/uploads`. Only formats the engine can display (`mp4`, `png`, `jpg`, `jpeg`) are imported; others are skipped with a message. See the Chinese sections above for installation, configuration and troubleshooting.

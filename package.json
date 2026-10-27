@@ -1,6 +1,6 @@
 {
   "name": "dsh-hao-import",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "DSH 启动时自动把 Hao Wallpaper 新下载的壁纸增量导入壁纸引擎（macOS/Windows，幂等，失败不影响启动）。",
   "type": "module",
   "main": "./lib/index.js",

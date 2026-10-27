@@ -2,6 +2,24 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.3.1 — 2026-10-27
+
+Windows 复核后的一轮健壮性修复。
+
+- **导入目标跟随壁纸引擎**：解析顺序改为 `DSH_WE_UPLOAD_DIR` → `<引擎目录>/config.json` 的 `uploadDir` → `<引擎目录>/uploads`。此前只写死 `uploads/`，用户在引擎里改过上传目录后，导入的壁纸不会出现在 DSH 里。
+- **只导入引擎认识的格式**：`mp4 / png / jpg / jpeg`；遇到 `.webm` / `.mov` / `.webp` / `.bmp` / `.gif` 等会明确打印「不受 DSH 壁纸引擎支持」并跳过，不再复制一个永远不显示的 `up-*.webm`。
+- **PowerShell 5.1 修复**：
+  - 缺 `import_hao.py`、缺 Python 等早期错误现在写入 `import.log`（插件以 `stdio=ignore` 后台启动，此前这些错误只剩一个退出码）。
+  - 冷却文件改为**找到 Python 之后**才写，避免「缺 Python」在 15 秒内被静默吞掉；`-DryRun` 不污染冷却。
+  - `-Force` / `-DryRun` 不再作为未知参数转发给 Python；支持 `--force` / `--dry-run`。
+  - Python 版本按主次版本比较，真正要求 3.8+。
+  - 捕获 Python 输出前切到 UTF-8，中文标题不再因 OEM 代码页变成乱码。
+  - 优先用 `USERPROFILE` 推导数据目录，不再被 Git Bash 残留的 `HOME` 带偏。
+- **bash 入口**：支持 `DSH_WE_DATA_DIR`；缺 Python / 缺脚本的失败也会写进 `import.log`。
+- **lib/index.js**：Windows 下 `USERPROFILE` 优先；退出码提示同时识别 `DSH_WE_DATA_DIR`；`spawn` 加 `windowsHide`。
+- **状态写入**：`dump_json` 在 Windows 上遇到 `PermissionError`（杀毒/引擎短暂占用）重试 3 次。
+- 测试增至 16 个；CI 增加 Windows PowerShell 5.1 冒烟测试与「早期失败必须写日志」断言。
+
 ## 1.3.0 — 2026-10-27
 
 Windows 兼容适配。
