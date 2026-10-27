@@ -20,6 +20,10 @@
 # 注意：插件以 stdio=ignore 后台启动本脚本，所以任何早期错误（缺脚本、缺 Python）
 # 都必须自己写进 import.log，否则用户只能看到一句「退出码 127」。
 $ErrorActionPreference = 'Continue'
+# Windows PowerShell 5.1 默认按 OEM 代码页解码子进程 stdout/stderr；Python 输出的是
+# UTF-8（PYTHONIOENCODING=utf-8），不显式设成 UTF-8 会把中文读成乱码再写进日志。
+try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false } catch {}
+try { $OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 if ($env:DSH_HAO_IMPORT_DEBUG -eq '1') {
   [Console]::Error.WriteLine("debug: ps=$($PSVersionTable.PSVersion) pythonLocation=$env:pythonLocation")
 }
