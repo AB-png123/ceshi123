@@ -73,7 +73,7 @@ jobs:
           $env:DSH_WALLPAPER_ENGINE_DIR = $engine
           & .\scripts\run-import.ps1 --force
           $log = Get-Content -Raw (Join-Path $engine 'import.log')
-          if ($log -notmatch 'rc=0' -or $log -notmatch '新增 1 条') { throw "unexpected log: $log" }
+          if ($log -notmatch 'rc=0' -or $log -notmatch 'up-hao-01\.png') { throw "unexpected log: $log" }
           if (-not (Test-Path (Join-Path $engine 'uploads/up-hao-01.png'))) { throw 'missing imported file' }
 
       - name: Windows PowerShell 5.1 smoke test
@@ -102,7 +102,7 @@ jobs:
           & .\scripts\run-import.ps1 -Force
           if ($LASTEXITCODE -ne 0) { throw "PowerShell 5.1 runner exited $LASTEXITCODE" }
           $log = Get-Content -Raw -Encoding UTF8 (Join-Path $engine 'import.log')
-          if ($log -notmatch 'rc=0' -or $log -notmatch '新增 1 条') { throw "unexpected log: $log" }
+          if ($log -notmatch 'rc=0' -or $log -notmatch 'up-hao-01\.png') { throw "unexpected log: $log" }
           if (-not (Test-Path (Join-Path $engine 'uploads/up-hao-01.png'))) { throw 'missing imported file' }
 
       - name: Windows PowerShell early failure is logged
