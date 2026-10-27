@@ -131,6 +131,14 @@ function Test-Python([string]$Exe, [string[]]$Prefix) {
   }
 }
 
+function Get-CommandPath($command) {
+  if ($null -eq $command) { return $null }
+  # Windows PowerShell 5.1 上部分 ApplicationInfo 的 .Source 为空，.Path 才可靠。
+  if ($command.Path) { return [string]$command.Path }
+  if ($command.Source) { return [string]$command.Source }
+  return $null
+}
+
 function Find-Python {
   $explicit = $env:DSH_HAO_IMPORT_PYTHON
   if ($explicit) {
@@ -140,27 +148,39 @@ function Find-Python {
     Write-Warning "dsh-hao-import: DSH_HAO_IMPORT_PYTHON=$explicit 不可用或低于 Python 3.8，继续自动探测"
   }
 
+  # 先收集明确路径，再退回 PATH，最后才试 py 启动器。
+  # setup-python 的解释器在 $env:pythonLocation；DSH 桌面版自带一份运行时。
+  $candidates = @()
+  if ($env:pythonLocation) {
+    $candidates += (Join-Path $env:pythonLocation 'python.exe')
+  }
   if ($HomeDir) {
     $runtime = Join-Path $HomeDir '.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\python'
-    $candidates = @(
+    $candidates += @(
       (Join-Path $runtime 'python.exe'),
       (Join-Path $runtime 'Scripts\python.exe'),
       (Join-Path $runtime 'bin\python3.exe')
     )
-    foreach ($c in $candidates) {
-      if ($c -and (Test-Path -LiteralPath $c) -and (Test-Python $c @())) {
-        return [pscustomobject]@{ Exe = $c; Prefix = @() }
-      }
+  }
+  foreach ($base in @("$env:LOCALAPPDATA\Programs\Python", "$env:ProgramFiles\Python", 'C:\Python')) {
+    if (-not $base -or -not (Test-Path -LiteralPath $base)) { continue }
+    $found = @(Get-ChildItem -Path (Join-Path $base 'Python3*\python.exe') -ErrorAction SilentlyContinue)
+    foreach ($f in $found) { $candidates += $f.FullName }
+  }
+  foreach ($name in @('python', 'python3')) {
+    $p = Get-CommandPath (Get-Command $name -ErrorAction SilentlyContinue)
+    if ($p) { $candidates += $p }
+  }
+  foreach ($c in $candidates) {
+    if ($c -and (Test-Path -LiteralPath $c) -and (Test-Python $c @())) {
+      return [pscustomobject]@{ Exe = $c; Prefix = @() }
     }
   }
 
-  $py = Get-Command py -ErrorAction SilentlyContinue
-  if ($py -and $py.Source -and (Test-Python $py.Source @('-3'))) {
-    return [pscustomobject]@{ Exe = $py.Source; Prefix = @('-3') }
-  }
-  $python = Get-Command python -ErrorAction SilentlyContinue
-  if ($python -and $python.Source -and (Test-Python $python.Source @())) {
-    return [pscustomobject]@{ Exe = $python.Source; Prefix = @() }
+  # py 启动器要 -3 才会选 Python 3。
+  $py = Get-CommandPath (Get-Command py -ErrorAction SilentlyContinue)
+  if ($py -and (Test-Python $py @('-3'))) {
+    return [pscustomobject]@{ Exe = $py; Prefix = @('-3') }
   }
   return $null
 }
