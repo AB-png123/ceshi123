@@ -200,4 +200,20 @@ test('skips formats the wallpaper engine cannot display', { skip }, () => {
   assert.ok(!existsSync(path.join(d.engine, 'uploads', '.meta.json')))
 })
 
+test('--report mirrors UTF-8 output for callers that cannot decode stdout', { skip }, () => {
+  const d = baseDirs('report-')
+  const itemDir = path.join(d.home, 'Downloads', 'hao-35')
+  mkdirSync(itemDir, { recursive: true })
+  const file = path.join(itemDir, 'wallpaper.png')
+  writeFileSync(file, 'png-bytes')
+  writeMetadata(d, [{ id: '35', title: '报告-中文-标题', localPath: file }])
+
+  const report = path.join(d.home, 'report.txt')
+  const res = run(['--report', report], envFor(d))
+  assert.equal(res.status, 0, res.stderr)
+  const text = readFileSync(report, 'utf8')
+  assert.match(text, /新增 1 条/)
+  assert.match(text, /报告-中文-标题/)
+})
+
 test.after(() => rmSync(WORK, { recursive: true, force: true }))

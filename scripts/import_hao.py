@@ -122,6 +122,39 @@ def data_dirs() -> list[str]:
     return default_data_dirs()
 
 
+class _Tee:
+    """把输出同时写到原 stdout/stderr 和一个 UTF-8 报告文件。
+
+    Windows PowerShell 5.1 在无控制台/重定向场景下会按 OEM 代码页解码子进程
+    输出，中文标题会变成乱码；由 Python 自己写 UTF-8 报告文件可以绕开这一层。
+    """
+
+    def __init__(self, *streams):
+        self._streams = streams
+
+    def write(self, text):
+        for stream in self._streams:
+            try:
+                stream.write(text)
+            except Exception:
+                pass
+        return len(text)
+
+    def flush(self):
+        for stream in self._streams:
+            try:
+                stream.flush()
+            except Exception:
+                pass
+
+    def isatty(self):
+        return False
+
+    @property
+    def encoding(self):
+        return "utf-8"
+
+
 def _engine_dir() -> str:
     """壁纸引擎的数据目录，和引擎 pluginDataDir() 保持同一解析顺序。"""
     legacy = os.environ.get("DSH_WALLPAPER_ENGINE_DIR")
@@ -367,7 +400,20 @@ def print_search_paths() -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="导入 Hao Wallpaper 壁纸到 DSH 壁纸引擎")
     parser.add_argument("--dry-run", action="store_true", help="只打印将要导入的条目，不写文件")
+    parser.add_argument("--report", metavar="PATH", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+
+    if args.report:
+        try:
+            report = open(args.report, "w", encoding="utf-8", newline="")
+        except OSError as exc:
+            print(f"! 无法写报告文件 {args.report}: {exc}", file=sys.stderr)
+        else:
+            import atexit
+
+            atexit.register(report.close)
+            sys.stdout = _Tee(sys.stdout, report)
+            sys.stderr = _Tee(sys.stderr, report)
 
     # --dry-run 只预演，不创建目录、不写任何文件。
     if not args.dry_run:

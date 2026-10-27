@@ -223,10 +223,16 @@ try {
   # 无控制台（后台/隐藏窗口）时设置会失败，忽略即可。
 }
 
+# Python 把报告同时写进 UTF-8 文件：PowerShell 5.1 在无控制台/重定向时
+# 会按 OEM 代码页解码原生命令输出，中文标题会乱码；读文件则不受影响。
+$Report = Join-Path $Engine '.import-report.tmp'
+Remove-Item -LiteralPath $Report -ErrorAction SilentlyContinue
+
 $all = @()
 if ($py.Prefix -and $py.Prefix.Count -gt 0) { $all += $py.Prefix }
 $all += $SCRIPT
 if ($Extra.Count -gt 0) { $all += $Extra }
+$all += @('--report', $Report)
 if ($Dry) { $all += '--dry-run' }
 
 $out = ''
@@ -239,15 +245,26 @@ try {
   $rc = 1
 }
 
+$body = ''
+if (Test-Path -LiteralPath $Report) {
+  try {
+    $body = [System.IO.File]::ReadAllText($Report, [System.Text.Encoding]::UTF8)
+  } catch {
+    $body = ''
+  }
+}
+if (-not $body) { $body = $out }
+
 $ts = Get-Stamp
-Write-Log "`n[$ts] rc=$rc`n$out`n"
+Write-Log "`n[$ts] rc=$rc`n$body`n"
+Remove-Item -LiteralPath $Report -ErrorAction SilentlyContinue
 
 if ($rc -ne 0) {
-  $tail = (($out -split "`r?`n") | Select-Object -Last 5) -join "`n"
+  $tail = (($body -split "`r?`n") | Select-Object -Last 5) -join "`n"
   Write-Output "导入失败（${rc}）："
   Write-Output $tail
   exit 1
 }
 
-Write-Output $out
+Write-Output $body
 exit 0

@@ -2,6 +2,14 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.3.2 — 2026-10-27
+
+修复 PowerShell 5.1 在无控制台/重定向场景下的日志乱码。
+
+- 1.3.1 通过设置 `[Console]::OutputEncoding` 来修正中文，但 DSH 以 `stdio=ignore` 后台启动、CI 也会重定向输出，此时该设置可能抛异常或不生效，`import.log` 里的中文标题仍是 `å£çº¸` 之类的乱码。
+- 现在由 Python 通过 `--report <path>` 把同一份报告以 UTF-8 写入临时文件，PowerShell 读取该文件后再追加到 `import.log`，完全绕开 PowerShell 的原生输出解码。
+- 新增对应测试（17 个）；Windows CI 增加「日志中的中文标题必须正确」断言，PowerShell 5.1 与 7 都覆盖。
+
 ## 1.3.1 — 2026-10-27
 
 Windows 复核后的一轮健壮性修复。
