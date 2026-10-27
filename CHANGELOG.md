@@ -2,6 +2,20 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.3.3 — 2026-10-27
+
+macOS 兼容性复查后的一轮修复。
+
+- **不再误选坏的 `/usr/bin/python3`**：1.3.3 会先校验候选解释器的版本（要求 3.8+）。未安装 Xcode CLT 时，`/usr/bin/python3` 只是个会弹「安装命令行开发者工具」的存根；现在会跳过它，避免启动时弹窗或日志里只有许可错误。
+- **补充 macOS 解释器候选**：DSH 自带运行时、`~/.pyenv/shims/python3`、Homebrew（Intel `/usr/local` 与 Apple Silicon `/opt/homebrew`）、MacPorts `/opt/local`、最后才是 `command -v python3`。
+- **`DSH_HAO_IMPORT_PYTHON` 显式指定时校验失败会明确报错**（exit 127 + 写 `import.log`），不再悄悄退回其他解释器。
+- **`DSH_WALLPAPER_ENGINE_DIR` 支持 `~`**（此前 `~` 会被当成字面目录名）。
+- **并发保护**：`uploads/.import.lock`（PID + 15 分钟陈旧判断）避免多个 DSH 窗口同时导入导致序号/状态互相覆盖；`--dry-run` 不拿锁。
+- **macOS 权限提示**：没有可导入项时提示到「系统设置 → 隐私与安全性 → 文件与文件夹」给 DSH 授权 Desktop/Documents。
+- 元数据 `localPath` 支持目录和 `~`，目录会按标准布局继续找 `wallpaper.mp4` / 首帧图。
+- 新增 `test/wrapper.test.mjs`（真实调用 `run-import.sh`，覆盖日志、锁、错误解释器）；测试共 20 个。
+- CI 矩阵加入 `macos-latest`。
+
 ## 1.3.2 — 2026-10-27
 
 修复 PowerShell 5.1 在无控制台/重定向场景下的日志乱码。

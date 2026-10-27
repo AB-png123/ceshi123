@@ -34,6 +34,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import os
 import shutil
@@ -241,6 +242,54 @@ def dump_json(path: str, data) -> None:
         raise
 
 
+def _release_lock(path: str) -> None:
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+def acquire_lock(path: str) -> bool:
+    """跨进程互斥，避免多个 DSH 窗口同时导入导致序号/状态互相覆盖。
+
+    锁文件里写 PID：进程被强杀时，下一个进程可以按「PID 不存在或超过 15 分钟」
+    判断为陈旧锁并清理。Windows 上 os.kill(pid, 0) 不可靠，只按时间判断。
+    """
+    for _ in range(2):
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+        except FileExistsError:
+            stale = False
+            try:
+                age = time.time() - os.path.getmtime(path)
+            except OSError:
+                age = 0.0
+            pid = 0
+            try:
+                with open(path, encoding="utf-8") as handle:
+                    pid = int(handle.read().strip() or "0")
+            except (OSError, ValueError):
+                pid = 0
+            if pid and not IS_WIN:
+                try:
+                    os.kill(pid, 0)
+                except OSError:
+                    stale = True
+            if age > 900:
+                stale = True
+            if not stale:
+                return False
+            try:
+                os.unlink(path)
+            except OSError:
+                return False
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(str(os.getpid()))
+        return True
+    return False
+
+
 def collect_catalog() -> tuple[dict[str, str], dict[str, str]]:
     """返回 (id -> 标题, id -> localPath)。
 
@@ -261,8 +310,10 @@ def collect_catalog() -> tuple[dict[str, str], dict[str, str]]:
                     continue
                 titles.setdefault(wid, item.get("title") or "")
                 path = item.get("localPath")
-                if isinstance(path, str) and path and os.path.isfile(path):
-                    local_paths.setdefault(wid, path)
+                if isinstance(path, str) and path:
+                    path = os.path.expanduser(path)
+                    if os.path.isfile(path) or os.path.isdir(path):
+                        local_paths.setdefault(wid, path)
 
         index = load_json(os.path.join(base, "wallpaper-cache-index.json"), {})
         for task in index.get("tasks") or []:
@@ -310,6 +361,8 @@ def candidates(folder: str) -> list[tuple[str, str]]:
 
 def candidates_for_path(path: str) -> list[tuple[str, str]]:
     """元数据 localPath 存在时，优先用它所在目录的标准布局，其次用文件本身。"""
+    if os.path.isdir(path):
+        return candidates(path)
     if not os.path.isfile(path):
         return []
     found = candidates(os.path.dirname(path))
@@ -395,6 +448,12 @@ def print_search_paths() -> None:
         "请先在 Hao Wallpaper 里下载一张壁纸；若装在非默认位置，"
         "用 HAO_WALLPAPER_DIR 或 HAO_WALLPAPER_DATA_DIR 指过去。"
     )
+    if sys.platform == "darwin":
+        print(
+            "macOS 提示：壁纸若在 ~/Desktop 或 ~/Documents，请在"
+            "「系统设置 → 隐私与安全性 → 文件与文件夹」里允许 DSH 访问对应目录；"
+            "没有授权时文件存在也读不到。"
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -409,8 +468,6 @@ def main(argv: list[str] | None = None) -> int:
         except OSError as exc:
             print(f"! 无法写报告文件 {args.report}: {exc}", file=sys.stderr)
         else:
-            import atexit
-
             atexit.register(report.close)
             sys.stdout = _Tee(sys.stdout, report)
             sys.stderr = _Tee(sys.stderr, report)
@@ -418,6 +475,11 @@ def main(argv: list[str] | None = None) -> int:
     # --dry-run 只预演，不创建目录、不写任何文件。
     if not args.dry_run:
         os.makedirs(UP, exist_ok=True)
+        lock_path = os.path.join(UP, ".import.lock")
+        if not acquire_lock(lock_path):
+            print("另一个导入进程正在运行，跳过本次")
+            return 0
+        atexit.register(_release_lock, lock_path)
     meta: dict = load_json(META, {})
     state: dict = load_json(STATE, {"ids": {}})
     seen: dict = state.setdefault("ids", {})

@@ -58,7 +58,8 @@ DSH 启动
 - **macOS**，或 **Windows 10/11**（Linux 理论上可用，未做专门测试）
 - **DeepSeek Harness** ≥ `0.2.0-rc.1`
 - **DSH 壁纸引擎插件**（`dsh-plugin-wallpaper-engine`）：本插件只负责把壁纸导入引擎的数据目录，壁纸的实际展示由该插件负责；没装它时导入的文件不会出现在 DSH 里
-- **Python 3.8+**（优先使用 DSH 自带运行时，找不到再退回系统 `python3` / `python`）
+- **Python 3.8+**（优先使用 DSH 自带运行时；macOS 上会先校验 `/usr/bin/python3` 是否真的可用，未装 Xcode CLT 时会跳过这个安装器存根）
+- macOS 建议已装 Xcode Command Line Tools（`xcode-select --install`）或 Homebrew Python；插件会自动找 `/opt/homebrew/bin/python3`、`/usr/local/bin/python3`、`/opt/local/bin/python3`、pyenv 等位置
 - **Hao Wallpaper**，并且至少下载过一张壁纸
 - Windows 需要 **PowerShell 5.1+**（系统自带）；不需要 Git Bash / WSL
 
@@ -71,7 +72,7 @@ DSH 启动
 dsh plugin --profile desktop add github:AB-png123/dshplugin
 
 # B. 或者从 Release 下载 tgz 后安装（Windows 下路径改成 C:\...）
-dsh plugin --profile desktop add /path/to/dsh-hao-import-1.3.2.tgz
+dsh plugin --profile desktop add /path/to/dsh-hao-import-1.3.3.tgz
 ```
 
 > 仓库早前名为 `AB-png123/ceshi123`，GitHub 会自动重定向；当前地址是 `AB-png123/dshplugin`。
@@ -181,6 +182,11 @@ Windows 上删除 `%USERPROFILE%\.dsh-wallpaper-engine` 即可清理数据。
 | 导入成功但 DSH 壁纸里看不到 | 壁纸引擎改过上传目录：检查 `<引擎目录>/config.json` 的 `uploadDir`，或 `DSH_WE_UPLOAD_DIR`；日志里的「导入目标（上传目录）」就是实际写入位置 |
 | Windows 日志中文乱码 | 升级到 1.3.2+（Python 写 UTF-8 报告文件，不再依赖 PowerShell 解码）；旧版受系统 OEM 代码页影响 |
 | Windows 提示脚本被禁用 | 插件本身用 `-ExecutionPolicy Bypass` 启动；手动执行时也加该参数，或直接运行 `python scripts\import_hao.py` |
+| macOS 启动时弹出「安装命令行开发者工具」 | 1.3.3+ 会先校验解释器并跳过不可用的 `/usr/bin/python3`；若仍出现，直接 `xcode-select --install`，或 `brew install python` 后重启 DSH |
+| macOS 报「指定的 DSH_HAO_IMPORT_PYTHON 不可用」 | 你显式指定的解释器不存在/低于 3.8；改成实际路径，或删掉该变量让插件自动探测 |
+| macOS 找不到 Homebrew 的 python3 | 从 Finder 启动的 DSH 不继承终端 PATH；1.3.3+ 已内置 `/opt/homebrew`、`/usr/local`、MacPorts、pyenv 候选，无需改 PATH；仍不行就设 `DSH_HAO_IMPORT_PYTHON` 为绝对路径 |
+| macOS 读不到 `~/Desktop/数据/壁纸` | 到「系统设置 → 隐私与安全性 → 文件与文件夹」允许 DSH 访问桌面/文稿；或用 `HAO_WALLPAPER_DIR` 指到可读位置 |
+| 多个 DSH 窗口同时启动，重复导入 | 1.3.3+ 用 `uploads/.import.lock` 互斥；看到「另一个导入进程正在运行」属正常跳过 |
 | 插件加载失败 | 确认 DSH 版本 ≥ `0.2.0-rc.1`（`package.json` 里的 `dsh.engines.dsh`） |
 
 ## 开发
