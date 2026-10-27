@@ -121,22 +121,16 @@ function Test-Python([string]$Exe, [string[]]$Prefix = @()) {
   try {
     # PowerShell 5.1 里未绑定的 [string[]] 是 $null，直接 @Prefix 会抛
     # "Cannot index into a null array"；先归一成数组再 splat。
+    # 代码里不能出现双引号：PS 5.1 不会转义内嵌的 "，会把它拆坏导致 Python SyntaxError。
     $cmdArgs = @()
     if ($Prefix) { $cmdArgs += $Prefix }
-    $cmdArgs += @('-c', 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))')
-    $v = & $Exe @cmdArgs 2>$null
-    if ($LASTEXITCODE -ne 0) { return $false }
-    $text = ("$v" -replace '\s', '')
+    $cmdArgs += @('-c', 'import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)')
+    $null = & $Exe @cmdArgs 2>$null
+    $code = $LASTEXITCODE
     if ($env:DSH_HAO_IMPORT_DEBUG -eq '1') {
-      [Console]::Error.WriteLine("debug: test $Exe => rc=$LASTEXITCODE text='$text'")
+      [Console]::Error.WriteLine("debug: test $Exe => rc=$code")
     }
-    if (-not $text) { return $false }
-    try {
-      $ver = [version]$text
-    } catch {
-      return $false
-    }
-    return ($ver -ge [version]'3.8')
+    return ($code -eq 0)
   } catch {
     if ($env:DSH_HAO_IMPORT_DEBUG -eq '1') {
       [Console]::Error.WriteLine("debug: test $Exe threw: $_")
