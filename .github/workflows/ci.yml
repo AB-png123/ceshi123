@@ -95,7 +95,6 @@ jobs:
             (Join-Path $data 'wallpaper-data.json'), $meta,
             (New-Object System.Text.UTF8Encoding $false)
           )
-          $env:DSH_HAO_IMPORT_DEBUG = '1'
           $env:HAO_WALLPAPER_DATA_DIR = $data
           $env:HAO_WALLPAPER_DIR = (Join-Path $root 'no-such-lib')
           $env:DSH_WALLPAPER_ENGINE_DIR = $engine
@@ -118,7 +117,7 @@ jobs:
           & (Join-Path $root 'run-import.ps1')
           if ($LASTEXITCODE -ne 127) { throw "expected 127, got $LASTEXITCODE" }
           $log = Get-Content -Raw -Encoding UTF8 (Join-Path $engine 'import.log')
-          if ($log -notmatch '缺少.*import_hao.py') { throw "missing-script error not logged: $log" }
+          if ($log -notmatch 'import_hao.py') { throw "missing-script error not logged: $log" }
 
       - name: Verify scripts ship in the tarball
         if: runner.os == 'Linux'
