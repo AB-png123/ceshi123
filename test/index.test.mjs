@@ -16,6 +16,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const LIB = fileURLToPath(new URL('../lib/index.js', import.meta.url))
+const IS_WIN = process.platform === 'win32'
 const STUB = '#!/bin/bash\nset -eu\necho ran > "$HOME/hao-import-marker"\n'
 const WORK = mkdtempSync(path.join(os.tmpdir(), 'dsh-hao-import-test-'))
 
@@ -57,7 +58,7 @@ function waitFor(file, timeoutMs = 3000) {
   return false
 }
 
-test('bundled script runs when the package ships scripts/', async () => {
+test('bundled script runs when the package ships scripts/', { skip: IS_WIN ? 'bash stub is POSIX-only' : false }, async () => {
   const root = makePackage(true, true)
   const home = mkdtempSync(path.join(WORK, 'home-'))
   const marker = path.join(home, 'hao-import-marker')
@@ -90,10 +91,9 @@ test('missing script fails loudly instead of silently skipping', async () => {
 
 test('missing import_hao.py is reported separately', async () => {
   const root = makePackage(true, false)
-  delete process.env.DSH_HAO_IMPORT_SCRIPT
   const errors = []
   const mod = await load(root)
-  mod.apply(fakeCtx(errors))
+  mod.applyFor('darwin', { HOME: os.tmpdir() }, fakeCtx(errors))
   assert.equal(errors.length, 1)
   assert.match(errors[0], /缺少 import_hao\.py/)
 })
@@ -111,6 +111,54 @@ test('an explicit DSH_HAO_IMPORT_SCRIPT that no longer exists is an error, not a
   } finally {
     delete process.env.DSH_HAO_IMPORT_SCRIPT
   }
+})
+
+test('win32 resolves the bundled PowerShell runner', async () => {
+  const mod = await import(`${pathToFileURL(LIB).href}?t=win-resolver`)
+  const launch = mod.resolveLaunch({ platform: 'win32', env: {} })
+  assert.equal(path.basename(launch.script), 'run-import.ps1')
+  assert.equal(launch.command, 'powershell.exe')
+  assert.deepEqual(launch.args.slice(0, -1), [
+    '-NoProfile',
+    '-NonInteractive',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+  ])
+  assert.equal(launch.args.at(-1), launch.script)
+  assert.equal(path.basename(launch.helper), 'import_hao.py')
+})
+
+test('posix resolves the bundled bash runner', async () => {
+  const mod = await import(`${pathToFileURL(LIB).href}?t=posix-resolver`)
+  const launch = mod.resolveLaunch({ platform: 'darwin', env: {} })
+  assert.equal(path.basename(launch.script), 'run-import.sh')
+  assert.equal(launch.command, '/bin/bash')
+  assert.deepEqual(launch.args, [launch.script])
+})
+
+test('an override wins and selects the launcher by extension', async () => {
+  const mod = await import(`${pathToFileURL(LIB).href}?t=override-resolver`)
+  const ps1 = mod.resolveLaunch({ platform: 'win32', env: { DSH_HAO_IMPORT_SCRIPT: 'C:\\tmp\\custom.ps1' } })
+  assert.equal(ps1.command, 'powershell.exe')
+  assert.equal(ps1.origin, 'DSH_HAO_IMPORT_SCRIPT')
+
+  const cmd = mod.resolveLaunch({ platform: 'win32', env: { DSH_HAO_IMPORT_SCRIPT: 'C:\\tmp\\custom.cmd' } })
+  assert.equal(cmd.command, 'cmd.exe')
+
+  const sh = mod.resolveLaunch({ platform: 'win32', env: { DSH_HAO_IMPORT_SCRIPT: 'C:\\tmp\\custom.sh' } })
+  assert.equal(sh.command, 'bash.exe')
+})
+
+test('win32 without a bundled run-import.ps1 fails loudly', async () => {
+  const root = makePackage(false, false)
+  const mod = await load(root)
+  const errors = []
+  mod.applyFor('win32', { HOME: os.tmpdir(), USERPROFILE: os.tmpdir() }, fakeCtx(errors))
+  assert.equal(errors.length, 1)
+  assert.match(errors[0], /找不到导入脚本/)
+  assert.match(errors[0], /run-import\.ps1/)
+  assert.match(errors[0], /插件包内置/)
 })
 
 test.after(() => rmSync(WORK, { recursive: true, force: true }))

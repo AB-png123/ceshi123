@@ -2,6 +2,18 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## 1.3.0 — 2026-10-27
+
+Windows 兼容适配。
+
+- 新增 `scripts/run-import.ps1`：PowerShell 5.1+ 入口，负责冷却、查找 Python、写日志；Windows 不再依赖 bash。
+- `lib/index.js` 按平台选择入口（`.sh` / `.ps1`，也支持覆盖为 `.cmd`），并抽出可测试的 `resolveLaunch()` / `applyFor()`。
+- `scripts/import_hao.py` 优先读取 Hao Wallpaper 元数据里的 `localPath`（绝对路径），不再强依赖 `~/Desktop/数据/壁纸` 目录；目录扫描降级为兜底。
+- 增加 Windows 默认路径探测（`%APPDATA%\Hao Wallpaper`、`%LOCALAPPDATA%`、`~/Pictures/Hao Wallpaper`、`~/Pictures/哲风壁纸`）。
+- 新增 `HAO_WALLPAPER_DIRS` 支持多个壁纸库；路径去重按 `normcase` 处理 Windows 大小写。
+- Python 输出统一 UTF-8，避免 Windows 控制台/重定向时中文报 `UnicodeEncodeError`。
+- 新增 4 个 Python 导入测试与 4 个平台解析测试；CI 改为 Ubuntu + Windows 矩阵，并在 Windows 上校验 PowerShell 语法。
+
 ## 1.2.0 — 2026-10-25
 
 修复「装完空转」：其他机器从 GitHub 安装后找不到脚本，插件只写一行日志、什么也不做。

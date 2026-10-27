@@ -1,7 +1,7 @@
 {
   "name": "dsh-hao-import",
-  "version": "1.2.0",
-  "description": "DSH 启动时自动把 Hao Wallpaper 新下载的壁纸增量导入壁纸引擎（幂等，失败不影响启动）。",
+  "version": "1.3.0",
+  "description": "DSH 启动时自动把 Hao Wallpaper 新下载的壁纸增量导入壁纸引擎（macOS/Windows，幂等，失败不影响启动）。",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -12,14 +12,16 @@
   "files": [
     "lib",
     "cordis.patch.yml",
-    "scripts",
+    "scripts/run-import.sh",
+    "scripts/run-import.ps1",
+    "scripts/import_hao.py",
     "install.sh",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
     "check": "node --check lib/index.js",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
@@ -40,6 +42,7 @@
     "deepseek-harness",
     "wallpaper",
     "hao-wallpaper",
+    "windows",
     "startup"
   ],
   "dsh": {

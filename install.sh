@@ -2,6 +2,7 @@
 # 可选工具：把导入脚本复制到 ~/.dsh/wallpaper-import/。
 #
 # 插件本身已自带 scripts/，装好插件即可工作，不需要运行本脚本。
+# 本脚本是 POSIX shell 的；Windows 用户不需要它（入口为 scripts/run-import.ps1）。
 # 只有当你想单独管理脚本副本（例如配合 launchd 定时调用）时才需要它；
 # 副本不会被插件自动使用，需设 DSH_HAO_IMPORT_SCRIPT 指过去。
 #
